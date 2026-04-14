@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Blueprint App</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 40px; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <h2>Blueprint Inventory App</h2>
+  {% if error %}
+    <div class="error">{{ error }}</div>
+  {% else %}
+    <div>Loading…</div>
+  {% endif %}
+</body>
+</html>
