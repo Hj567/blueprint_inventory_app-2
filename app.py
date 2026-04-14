@@ -196,7 +196,7 @@ def load_inventory(excel_path: Path) -> list[InventoryUnit]:
 
 
 def extract_unit_positions(
-    pdf_path: Path, render_scale: float = 1.8
+    pdf_path: Path, render_scale: float = 0.75
 ) -> tuple[dict[str, UnitPosition], list[dict[str, Any]]]:
     doc = fitz.open(pdf_path)
     positions: dict[str, UnitPosition] = {}
