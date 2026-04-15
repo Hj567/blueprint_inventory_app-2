@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blueprint Inventory Viewer</title>
+  <script src="/firebase-config.js"></script>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --panel-soft: #fafbfc;
+      --text: #18212b;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --dark: #111827;
+      --primary: #1f6feb;
+      --primary-soft: #e8f0fe;
+      --success: #0f9d58;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --shadow: 0 10px 30px rgba(17, 24, 39, 0.08);
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 390px 1fr;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      padding: 18px;
+      overflow-y: auto;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+
+    .main {
+      padding: 22px;
+      overflow-y: auto;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 18px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.2;
+      font-weight: 700;
+    }
+
+    .brand .sub {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .card h2,
+    .card h3 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      line-height: 1.3;
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .stat-box {
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 12px;
+      padding: 11px 12px;
+      font-size: 14px;
+      outline: none;
+      transition: 0.2s ease;
+    }
+
+    input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(31, 111, 235, 0.1);
+    }
+
+    .btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.18s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: var(--dark);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #0b1220;
+    }
+
+    .btn-secondary {
+      background: #eef2f7;
+      color: var(--dark);
+    }
+
+    .btn-secondary:hover {
+      background: #e5eaf1;
+    }
+
+    .status-pill {
+      margin-top: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .selected-summary {
+      display: grid;
+      gap: 10px;
+    }
+
+    .selected-highlight {
+      background: linear-gradient(135deg, #eef4ff, #f8fbff);
+      border: 1px solid #dce7fb;
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .selected-highlight .big {
+      font-size: 22px;
+      font-weight: 800;
+      margin-top: 4px;
+    }
+
+    .selected-highlight .small {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .list-search {
+      margin-bottom: 10px;
+    }
+
+    .unit-list {
+      max-height: 320px;
+      overflow-y: auto;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel-soft);
+    }
+
+    .unit-row {
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .unit-row:last-child {
+      border-bottom: none;
+    }
+
+    .unit-row strong {
+      font-size: 14px;
+    }
+
+    .unit-meta {
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .saved-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 12px;
+      font-size: 13px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+    }
+
+    th {
+      background: #f8fafc;
+      color: var(--muted);
+      font-weight: 700;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .load-mini-btn {
+      padding: 7px 10px;
+      border-radius: 10px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(244, 246, 248, 0.88);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(229, 231, 235, 0.9);
+      padding-bottom: 14px;
+      margin-bottom: 18px;
+    }
+
+    .toolbar-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar-left h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .toolbar-left p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .toolbar-right {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      background: #f3f4f6;
+      color: #374151;
+      border-radius: 999px;
+      padding: 9px 12px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .page-wrap {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+
+    .page-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .page-title {
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .page-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .page-stage-shell {
+      overflow: auto;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 12px;
+    }
+
+    .page-stage {
+      position: relative;
+      display: inline-block;
+      line-height: 0;
+    }
+
+    .page-stage img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: 10px;
+    }
+
+    .marker {
+      position: absolute;
+      background: rgba(255, 59, 48, 0.18);
+      border: 2px solid rgba(220, 38, 38, 0.95);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: 0.15s ease;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.6);
+    }
+
+    .marker:hover {
+      transform: scale(1.06);
+      background: rgba(255, 59, 48, 0.28);
+    }
+
+    .marker.selected {
+      background: rgba(31, 111, 235, 0.28);
+      border-color: rgba(31, 111, 235, 0.98);
+      box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.15);
+    }
+
+    .empty-note {
+      color: var(--muted);
+      font-size: 13px;
+      padding: 14px;
+    }
+
+    .footer-note {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 1180px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: relative;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .toolbar {
+        position: relative;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <h1>Blueprint Inventory Viewer</h1>
+        <div class="sub">Track, save, compare, and review unsold units visually.</div>
+      </div>
+
+      <div class="card">
+        <h2>Workspace</h2>
+        <label for="userName">Your name</label>
+        <input id="userName" placeholder="Enter your name" />
+
+        <div class="btn-row">
+          <button class="btn-primary" id="saveBtn">Save</button>
+          <button class="btn-secondary" id="loadBtn">Load Mine</button>
+          <button class="btn-secondary" id="clearBtn">Clear</button>
+        </div>
+
+        <div id="saveStatus" class="status-pill">
+          <span class="status-dot"></span>
+          <span>Connecting...</span>
+        </div>
+
+        <div class="footer-note">
+          Each user's selection is stored separately and can be loaded again later for comparison.
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Project Summary</h3>
+        <div class="mini-grid">
+          <div class="stat-box">
+            <div class="stat-label">Unsold Units</div>
+            <div class="stat-value">{{ dataset.summary.total_unsold_units }}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Matched on Plan</div>
+            <div class="stat-value">{{ dataset.summary.matched_on_blueprint }}</div>
+          </div>
+          <div class="stat-box" style="grid-column: 1 / -1;">
+            <div class="stat-label">Total Unsold Area</div>
+            <div class="stat-value">{{ dataset.summary.total_unsold_area_sqft }} sq.ft</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Your Selection</h3>
+        <div class="selected-summary">
+          <div class="selected-highlight">
+            <div class="small">Selected Units</div>
+            <div class="big" id="selectedCount">0 units</div>
+          </div>
+          <div class="selected-highlight">
+            <div class="small">Selected Area</div>
+            <div class="big" id="selectedArea">0 sq.ft</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Selected Unit Details</h3>
+        <input class="list-search" id="unitSearch" placeholder="Search selected units..." />
+        <div class="unit-list" id="unitList">
+          <div class="empty-note">No units selected.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Saved Selections</h3>
+        <div class="saved-table-wrap">
+          <table id="savedSelectionsTable">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Units</th>
+                <th>Area</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="4" class="empty-note">No saved selections yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="toolbar">
+        <div class="toolbar-card">
+          <div class="toolbar-left">
+            <h2>Site Blueprint</h2>
+            <p>Click any highlighted unit label to add or remove it from your basket.</p>
+          </div>
+          <div class="toolbar-right">
+            <div class="chip">Job ID: {{ job_id }}</div>
+            <div class="chip">Blue = selected</div>
+            <div class="chip">Red = available to select</div>
+          </div>
+        </div>
+      </div>
+
+      {% for page in dataset.pages %}
+      <div class="page-wrap">
+        <div class="page-head">
+          <div>
+            <div class="page-title">Page {{ page.page }}</div>
+            <div class="page-sub">Rendered blueprint layer with interactive unit markers</div>
+          </div>
+          <div class="chip">{{ page.rendered_width }} × {{ page.rendered_height }}</div>
+        </div>
+
+        <div class="page-stage-shell">
+          <div
+            class="page-stage"
+            data-page="{{ page.page }}"
+            data-page-width="{{ page.width }}"
+            data-page-height="{{ page.height }}"
+          >
+            <img src="{{ url_for('prebuilt_file', filename=page.image) }}" alt="Page {{ page.page }}" />
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </main>
+  </div>
+
+  <script type="application/json" id="dataset-json">{{ dataset|tojson }}</script>
+
+  <script>
+    const dataset = JSON.parse(document.getElementById("dataset-json").textContent);
+    const jobId = {{ job_id|tojson }};
+    const selectedUnits = new Set();
+    const unitsByCode = new Map(dataset.units.map(u => [u.unit_code, u]));
+
+    const userNameInput = document.getElementById("userName");
+    const saveStatus = document.getElementById("saveStatus");
+    const selectedCount = document.getElementById("selectedCount");
+    const selectedArea = document.getElementById("selectedArea");
+    const unitList = document.getElementById("unitList");
+    const unitSearch = document.getElementById("unitSearch");
+    const savedSelectionsTableBody = document.querySelector("#savedSelectionsTable tbody");
+
+    const LOCAL_USER_KEY = `blueprint_user_${jobId}`;
+    const rememberedName = localStorage.getItem(LOCAL_USER_KEY);
+    if (rememberedName) userNameInput.value = rememberedName;
+
+    userNameInput.addEventListener("change", () => {
+      localStorage.setItem(LOCAL_USER_KEY, userNameInput.value.trim());
+    });
+
+    function setStatus(message, type = "info") {
+      let bg = "#e8f0fe";
+      let color = "#1f6feb";
+
+      if (type === "success") {
+        bg = "#eaf7ef";
+        color = "#0f9d58";
+      } else if (type === "error") {
+        bg = "#fdecec";
+        color = "#dc2626";
+      } else if (type === "warning") {
+        bg = "#fff6e8";
+        color = "#d97706";
+      }
+
+      saveStatus.style.background = bg;
+      saveStatus.style.color = color;
+      saveStatus.innerHTML = `<span class="status-dot"></span><span>${message}</span>`;
+    }
+
+    function updateSelectionSummary() {
+      const selected = Array.from(selectedUnits)
+        .map(code => unitsByCode.get(code))
+        .filter(Boolean);
+
+      const totalArea = selected.reduce((sum, unit) => sum + (Number(unit.total_area_sqft) || 0), 0);
+
+      selectedCount.textContent = `${selected.length} unit${selected.length === 1 ? "" : "s"}`;
+      selectedArea.textContent = `${totalArea.toFixed(2)} sq.ft`;
+
+      renderUnitList();
+      refreshMarkers();
+    }
+
+    function toggleUnit(code) {
+      if (selectedUnits.has(code)) selectedUnits.delete(code);
+      else selectedUnits.add(code);
+      updateSelectionSummary();
+    }
+
+    function renderUnitList() {
+      const query = unitSearch.value.trim().toLowerCase();
+
+      const selected = Array.from(selectedUnits)
+        .map(code => unitsByCode.get(code))
+        .filter(Boolean)
+        .filter(unit => !query || unit.unit_code.toLowerCase().includes(query));
+
+      if (!selected.length) {
+        unitList.innerHTML = `<div class="empty-note">No matching selected units.</div>`;
+        return;
+      }
+
+      unitList.innerHTML = selected.map(unit => `
+        <div class="unit-row">
+          <strong>${unit.unit_code}</strong>
+          <div class="unit-meta">
+            Area: ${unit.total_area_sqft ?? "-"} sq.ft<br>
+            UDS: ${unit.uds_sqft ?? "-"}<br>
+            Type: ${unit.type ?? "-"} | Floor: ${unit.floor ?? unit.level ?? "-"}
+          </div>
+        </div>
+      `).join("");
+    }
+
+    unitSearch.addEventListener("input", renderUnitList);
+
+    function refreshMarkers() {
+      document.querySelectorAll(".marker").forEach(marker => {
+        const code = marker.dataset.code;
+        marker.classList.toggle("selected", selectedUnits.has(code));
+      });
+    }
+
+    function renderMarkers() {
+      dataset.units.forEach(unit => {
+        if (!unit.page || unit.x == null || unit.y == null) return;
+
+        const stage = document.querySelector(`.page-stage[data-page="${unit.page}"]`);
+        if (!stage) return;
+
+        const img = stage.querySelector("img");
+        const stageWidth = img.clientWidth;
+        const stageHeight = img.clientHeight;
+        const pageWidth = Number(stage.dataset.pageWidth);
+        const pageHeight = Number(stage.dataset.pageHeight);
+
+        if (!stageWidth || !stageHeight || !pageWidth || !pageHeight) return;
+
+        const left = (unit.x / pageWidth) * stageWidth;
+        const top = (unit.y / pageHeight) * stageHeight;
+        const width = Math.max((unit.w / pageWidth) * stageWidth, 34);
+        const height = Math.max((unit.h / pageHeight) * stageHeight, 24);
+
+        const marker = document.createElement("div");
+        marker.className = "marker";
+        marker.dataset.code = unit.unit_code;
+        marker.title = `${unit.unit_code} | ${unit.total_area_sqft ?? "-"} sq.ft`;
+        marker.style.left = `${left}px`;
+        marker.style.top = `${top}px`;
+        marker.style.width = `${width}px`;
+        marker.style.height = `${height}px`;
+        marker.addEventListener("click", () => toggleUnit(unit.unit_code));
+        stage.appendChild(marker);
+      });
+
+      refreshMarkers();
+    }
+
+    window.addEventListener("load", () => {
+      renderMarkers();
+      updateSelectionSummary();
+    });
+
+    window.addEventListener("resize", () => {
+      document.querySelectorAll(".marker").forEach(el => el.remove());
+      renderMarkers();
+    });
+  </script>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getFirestore,
+      doc,
+      setDoc,
+      getDoc,
+      collection,
+      serverTimestamp,
+      onSnapshot,
+      query,
+      orderBy
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseReady = window.BLUEPRINT_APP_FIREBASE_READY;
+    const firebaseConfig = window.BLUEPRINT_APP_FIREBASE_CONFIG;
+
+    let db = null;
+
+    if (firebaseReady) {
+      const app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+      setStatus("Firestore connected", "success");
+      subscribeToSavedSelections();
+    } else {
+      setStatus("Firebase config missing", "warning");
+    }
+
+    function getCurrentUserName() {
+      const name = userNameInput.value.trim();
+      if (!name) {
+        alert("Please enter your name first.");
+        return null;
+      }
+      localStorage.setItem(`blueprint_user_${jobId}`, name);
+      return name;
+    }
+
+    function getUserDocRef(name) {
+      const safeName = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+      return doc(db, "blueprintSelections", jobId, "users", safeName);
+    }
+
+    async function saveSelection() {
+      if (!db) {
+        alert("Firestore is not connected.");
+        return;
+      }
+
+      const userName = getCurrentUserName();
+      if (!userName) return;
+
+      const units = Array.from(selectedUnits);
+      const totalArea = units
+        .map(code => unitsByCode.get(code))
+        .filter(Boolean)
+        .reduce((sum, unit) => sum + (Number(unit.total_area_sqft) || 0), 0);
+
+      try {
+        await setDoc(getUserDocRef(userName), {
+          userName,
+          jobId,
+          units,
+          unitCount: units.length,
+          totalAreaSqft: Number(totalArea.toFixed(2)),
+          updatedAt: serverTimestamp()
+        });
+
+        setStatus(`Saved ${units.length} units for ${userName}`, "success");
+      } catch (err) {
+        console.error(err);
+        setStatus("Save failed", "error");
+        alert("Could not save selection.");
+      }
+    }
+
+    async function loadMySelection() {
+      if (!db) {
+        alert("Firestore is not connected.");
+        return;
+      }
+
+      const userName = getCurrentUserName();
+      if (!userName) return;
+
+      try {
+        const snap = await getDoc(getUserDocRef(userName));
+        if (!snap.exists()) {
+          setStatus(`No saved selection found for ${userName}`, "warning");
+          return;
+        }
+
+        const data = snap.data();
+        selectedUnits.clear();
+        (data.units || []).forEach(code => selectedUnits.add(code));
+        updateSelectionSummary();
+        setStatus(`Loaded saved selection for ${userName}`, "success");
+      } catch (err) {
+        console.error(err);
+        setStatus("Load failed", "error");
+        alert("Could not load your saved selection.");
+      }
+    }
+
+    async function loadSelectionForUserName(userName) {
+      if (!db) return;
+
+      try {
+        const snap = await getDoc(getUserDocRef(userName));
+        if (!snap.exists()) return;
+
+        const data = snap.data();
+        selectedUnits.clear();
+        (data.units || []).forEach(code => selectedUnits.add(code));
+        updateSelectionSummary();
+
+        userNameInput.value = data.userName || userName;
+        localStorage.setItem(`blueprint_user_${jobId}`, userNameInput.value.trim());
+        setStatus(`Loaded selection for ${data.userName || userName}`, "success");
+      } catch (err) {
+        console.error(err);
+        alert("Could not load compared user's selection.");
+      }
+    }
+
+    function subscribeToSavedSelections() {
+      const usersCol = collection(db, "blueprintSelections", jobId, "users");
+      const q = query(usersCol, orderBy("userName"));
+
+      onSnapshot(q, snapshot => {
+        const rows = [];
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          rows.push(`
+            <tr>
+              <td><strong>${data.userName || "-"}</strong></td>
+              <td>${data.unitCount || 0}</td>
+              <td>${data.totalAreaSqft || 0}</td>
+              <td><button class="load-mini-btn" data-load-user="${data.userName || ""}">Load</button></td>
+            </tr>
+          `);
+        });
+
+        savedSelectionsTableBody.innerHTML = rows.length
+          ? rows.join("")
+          : `<tr><td colspan="4" class="empty-note">No saved selections yet.</td></tr>`;
+
+        document.querySelectorAll("[data-load-user]").forEach(btn => {
+          btn.addEventListener("click", () => loadSelectionForUserName(btn.dataset.loadUser));
+        });
+      });
+    }
+
+    document.getElementById("saveBtn").addEventListener("click", saveSelection);
+    document.getElementById("loadBtn").addEventListener("click", loadMySelection);
+    document.getElementById("clearBtn").addEventListener("click", () => {
+      selectedUnits.clear();
+      updateSelectionSummary();
+      setStatus("Selection cleared locally", "warning");
+    });
+
+    window.addEventListener("load", () => {
+      const rememberedName = localStorage.getItem(`blueprint_user_${jobId}`);
+      if (rememberedName && db) {
+        setTimeout(() => loadMySelection(), 400);
+      }
+    });
+  </script>
+</body>
+</html>
